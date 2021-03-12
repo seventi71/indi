@@ -398,12 +398,10 @@ void IEQPro::getStartupData()
 
             case ST_TRACKING_PEC_OFF:
                 setPECState(PEC_OFF);
-                GetPECDataStatus(true);
                 break;
 
             case ST_TRACKING_PEC_ON:
                 setPECState(PEC_ON);
-                GetPECDataStatus(true);
                 break;
         }
         scopeInfo = newInfo;
@@ -536,14 +534,9 @@ bool IEQPro::ISNewSwitch(const char *dev, const char *name, ISState *states, cha
 
         if(IUFindOnSwitchIndex(&PECStateSP) == 1)
         {
-            // PEC ON
-            if (GetPECDataStatus(true))
-            {
-                // Data Check
                 driver->setPECEnabled(true);
                 PECStateSP.s = IPS_BUSY;
                 LOG_INFO("Enabling PEC Chip");
-            }
         }
         IDSetSwitch(&PECStateSP, nullptr);
         return true;
@@ -595,7 +588,7 @@ bool IEQPro::ISNewSwitch(const char *dev, const char *name, ISState *states, cha
             if(IUFindOnSwitchIndex(&PECTrainingSP) == 1)
             {
                 // Train Status
-                GetPECDataStatus(true);
+                LOG_WARN("PEC Data status not supported");
             }
         }
         IDSetSwitch(&PECTrainingSP, nullptr);
@@ -723,9 +716,9 @@ bool IEQPro::ReadScopeStatus()
     {
         if (TrackState == SCOPE_TRACKING)
         {
-            if(GetPECDataStatus(false))
+            if(Wormdrive == PECTime)  // Remove check for training completion
             {
-                sprintf(PECText, "%d second worm cycle recorded", PECTime);
+                sprintf(PECText, "%d sec worm cycle recorded", PECTime); 
                 LOG_INFO(PECText);
                 PECTrainingSP.s = IPS_OK;
                 isTraining = false;
@@ -733,7 +726,7 @@ bool IEQPro::ReadScopeStatus()
             else
             {
                 PECTime = PECTime + 1 * getCurrentPollingPeriod() / 1000;
-                sprintf(PECText, "Recording: %d s", PECTime);
+                sprintf(PECText, "Recording: %d sec", PECTime);
                 IUSaveText(&PECInfoT[0], PECText);
             }
         }
@@ -1322,29 +1315,4 @@ bool IEQPro::SetTrackEnabled(bool enabled)
     }
 
     return driver->setTrackEnabled(enabled);
-}
-
-/* v3.0 PEC add data status to the Driver */
-bool IEQPro::GetPECDataStatus(bool enabled)
-{
-    if(driver->getPETEnabled(true))
-    {
-        if (enabled)
-        {
-            IUSaveText(&PECInfoT[0], "Recorded");
-            IDSetText(&PECInfoTP, nullptr);
-            LOG_INFO("Mount PEC Chip Ready and Trained");
-        }
-        return true;
-    }
-    else
-    {
-        if (enabled)
-        {
-            IUSaveText(&PECInfoT[0], "None");
-            IDSetText(&PECInfoTP, nullptr);
-            LOG_INFO("Mount PEC Chip Needs Training");
-        }
-    }
-    return false;
 }
