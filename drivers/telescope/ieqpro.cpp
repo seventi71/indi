@@ -87,6 +87,9 @@ IEQPro::IEQPro()
     scopeInfo.gpsStatus    = GPS_OFF;
     scopeInfo.systemStatus = ST_STOPPED;
     scopeInfo.trackRate    = TR_SIDEREAL;
+    /* v3.0 use default PEC Settings */
+    scopeInfo.systemStatus = ST_TRACKING_PEC_OFF;
+    // End Mod */
     scopeInfo.slewRate     = SR_1;
     scopeInfo.timeSource   = TS_RS232;
     scopeInfo.hemisphere   = HEMI_NORTH;
@@ -94,6 +97,9 @@ IEQPro::IEQPro()
     DBG_SCOPE = INDI::Logger::getInstance().addDebugLevel("Scope Verbose", "SCOPE");
 
     SetTelescopeCapability(TELESCOPE_CAN_PARK | TELESCOPE_CAN_SYNC | TELESCOPE_CAN_GOTO | TELESCOPE_CAN_ABORT |
+                            /* v3.0 use default PEC Settings */
+                           TELESCOPE_HAS_PEC  |
+                           // End Mod */
                            TELESCOPE_HAS_TIME | TELESCOPE_HAS_LOCATION | TELESCOPE_HAS_TRACK_MODE | TELESCOPE_CAN_CONTROL_TRACK |
                            TELESCOPE_HAS_TRACK_RATE,
                            9);
@@ -171,6 +177,20 @@ bool IEQPro::initProperties()
     IUFillSwitchVector(&HomeSP, HomeS, 3, getDeviceName(), "HOME", "Home", MAIN_CONTROL_TAB, IP_RW, ISR_ATMOST1, 0,
                        IPS_IDLE);
 
+    /* v3.0 Create PEC Training switches */
+    // PEC Training
+    IUFillSwitch(&PECTrainingS[0], "PEC_Recording", "Record", ISS_OFF);
+    IUFillSwitch(&PECTrainingS[1], "PEC_Status", "Status", ISS_OFF);
+    IUFillSwitchVector(&PECTrainingSP, PECTrainingS, 2, getDeviceName(), "PEC_TRAINING", "Training", MOTION_TAB, IP_RW,
+                       ISR_1OFMANY, 0,
+                       IPS_IDLE);
+
+    // Create PEC Training Information */
+    IUFillText(&PECInfoT[0], "PEC_INFO", "Status", "");
+    IUFillTextVector(&PECInfoTP, PECInfoT, 1, getDeviceName(), "PEC_INFOS", "Data", MOTION_TAB,
+                     IP_RO, 60, IPS_IDLE);
+    // End Mod */
+
     /* How fast do we guide compared to sidereal rate */
     IUFillNumber(&GuideRateN[RA_AXIS], "RA_GUIDE_RATE", "RA", "%.2f", 0.01, 0.9, 0.1, 0.5);
     IUFillNumber(&GuideRateN[DEC_AXIS], "DE_GUIDE_RATE", "DE", "%.2f", 0.1, 0.99, 0.1, 0.5);
@@ -217,6 +237,11 @@ bool IEQPro::updateProperties()
             HomeSP.nsp = 2;
 
         defineProperty(&HomeSP);
+        
+        /* v3.0 Create PEC switches */
+        defineProperty(&PECTrainingSP);
+        defineProperty(&PECInfoTP);
+        // End Mod */
 
         defineProperty(&GuideNSNP);
         defineProperty(&GuideWENP);
@@ -235,6 +260,11 @@ bool IEQPro::updateProperties()
 
         HomeSP.nsp = 3;
         deleteProperty(HomeSP.name);
+
+        /* v3.0 Delete PEC switches */
+        deleteProperty(PECTrainingSP.name);
+        deleteProperty(PECInfoTP.name);
+        // End Mod*/
 
         deleteProperty(GuideNSNP.name);
         deleteProperty(GuideWENP.name);
@@ -351,6 +381,33 @@ void IEQPro::getStartupData()
         SetTelescopeCapability(cap, 9);
     }
 
+   /* v3.0 Read PEC State at startup */
+    iEQ::Base::Info newInfo;
+    if (driver->getStatus(&newInfo))
+    {
+        switch (newInfo.systemStatus)
+        {
+            case ST_STOPPED:
+            case ST_PARKED:
+            case ST_HOME:
+            case ST_SLEWING:
+            case ST_MERIDIAN_FLIPPING:
+            case ST_GUIDING:
+
+            case ST_TRACKING_PEC_OFF:
+                setPECState(PEC_OFF);
+                GetPECDataStatus(true);
+                break;
+
+            case ST_TRACKING_PEC_ON:
+                setPECState(PEC_ON);
+                GetPECDataStatus(true);
+                break;
+        }
+        scopeInfo = newInfo;
+    }
+    // End Mod */
+
     //    if (isSimulation())
     //    {
     //        if (isParked())
@@ -453,6 +510,97 @@ bool IEQPro::ISNewSwitch(const char *dev, const char *name, ISState *states, cha
         }
     }
 
+        /* v3.0 PEC add controls and calls to the driver */
+    if (!strcmp(name, PECStateSP.name))
+    {
+        IUUpdateSwitch(&PECStateSP, states, names, n);
+
+        if(IUFindOnSwitchIndex(&PECStateSP) == 0)
+        {
+            // PEC OFF
+            if(isTraining)
+            {
+                // Training check
+                sprintf(PECText, "Mount PEC busy recording, %d s", PECTime);
+                LOG_WARN(PECText);
+            }
+            else
+            {
+                driver->setPECEnabled(false);
+                PECStateSP.s = IPS_OK;
+                LOG_INFO("Disabling PEC Chip");
+            }
+        }
+
+        if(IUFindOnSwitchIndex(&PECStateSP) == 1)
+        {
+            // PEC ON
+            if (GetPECDataStatus(true))
+            {
+                // Data Check
+                driver->setPECEnabled(true);
+                PECStateSP.s = IPS_BUSY;
+                LOG_INFO("Enabling PEC Chip");
+            }
+        }
+        IDSetSwitch(&PECStateSP, nullptr);
+        return true;
+    }
+    // End Mod */
+
+    /* v3.0 PEC add Training Controls to the Driver */
+    if (!strcmp(name, PECTrainingSP.name))
+    {
+        IUUpdateSwitch(&PECTrainingSP, states, names, n);
+        if(isTraining)
+        {
+            // Check if already training
+            if(IUFindOnSwitchIndex(&PECTrainingSP) == 1)
+            {
+                // Train Check Status
+                sprintf(PECText, "Mount PEC busy recording, %d s", PECTime);
+                LOG_WARN(PECText);
+            }
+
+            if(IUFindOnSwitchIndex(&PECTrainingSP) == 0)
+            {
+                // Train Cancel
+                driver->setPETEnabled(false);
+                isTraining = false;
+                PECTrainingSP.s = IPS_ALERT;
+                LOG_WARN("PEC Training cancelled by user, chip disabled");
+            }
+        }
+        else
+        {
+            if(IUFindOnSwitchIndex(&PECTrainingSP) == 0)
+            {
+                if(TrackState == SCOPE_TRACKING)
+                {
+                    // Train if tracking /guiding
+                    driver->setPETEnabled(true);
+                    isTraining = true;
+                    PECTime = 0;
+                    PECTrainingSP.s = IPS_BUSY;
+                    LOG_INFO("PEC recording started...");
+                }
+                else
+                {
+                    LOG_WARN("PEC Training only possible while guiding");
+                    PECTrainingSP.s = IPS_IDLE;
+                }
+            }
+            if(IUFindOnSwitchIndex(&PECTrainingSP) == 1)
+            {
+                // Train Status
+                GetPECDataStatus(true);
+            }
+        }
+        IDSetSwitch(&PECTrainingSP, nullptr);
+        return true;
+    }
+    // End Mod */
+
     return INDI::Telescope::ISNewSwitch(dev, name, states, names, n);
 }
 
@@ -528,8 +676,14 @@ bool IEQPro::ReadScopeStatus()
                 if (TrackState != SCOPE_SLEWING && TrackState != SCOPE_PARKING)
                     TrackState = SCOPE_SLEWING;
                 break;
+            /* v3.0 PEC update status */
             case ST_TRACKING_PEC_OFF:
+                setPECState(PEC_OFF);
+                break;
             case ST_TRACKING_PEC_ON:
+                setPECState(PEC_ON);
+                break;
+            // End Mod */
             case ST_GUIDING:
                 if (TrackState == SCOPE_PARKING && canParkNatively == false)
                 {
@@ -561,6 +715,38 @@ bool IEQPro::ReadScopeStatus()
 
         scopeInfo = newInfo;
     }
+
+    /* v3.0 Monitor PEC Training */
+    if (isTraining)
+    {
+        if (TrackState == SCOPE_TRACKING)
+        {
+            if(GetPECDataStatus(false))
+            {
+                sprintf(PECText, "%d second worm cycle recorded", PECTime);
+                LOG_INFO(PECText);
+                PECTrainingSP.s = IPS_OK;
+                isTraining = false;
+            }
+            else
+            {
+                PECTime = PECTime + 1 * getCurrentPollingPeriod() / 1000;
+                sprintf(PECText, "Recording: %d s", PECTime);
+                IUSaveText(&PECInfoT[0], PECText);
+            }
+        }
+        else
+        {
+            driver->setPETEnabled(false);
+            PECTrainingSP.s = IPS_ALERT;
+            sprintf(PECText, "Tracking error, recording cancelled %d s", PECTime);
+            LOG_ERROR(PECText);
+            IUSaveText(&PECInfoT[0], "Cancelled");
+        }
+        IDSetText(&PECInfoTP, nullptr);
+        IDSetSwitch(&PECTrainingSP, nullptr);
+    }
+    // End Mod */
 
     if (HasPierSide())
     {
@@ -1134,4 +1320,29 @@ bool IEQPro::SetTrackEnabled(bool enabled)
     }
 
     return driver->setTrackEnabled(enabled);
+}
+
+/* v3.0 PEC add data status to the Driver */
+bool IEQPro::GetPECDataStatus(bool enabled)
+{
+    if(driver->getPETEnabled(true))
+    {
+        if (enabled)
+        {
+            IUSaveText(&PECInfoT[0], "Recorded");
+            IDSetText(&PECInfoTP, nullptr);
+            LOG_INFO("Mount PEC Chip Ready and Trained");
+        }
+        return true;
+    }
+    else
+    {
+        if (enabled)
+        {
+            IUSaveText(&PECInfoT[0], "None");
+            IDSetText(&PECInfoTP, nullptr);
+            LOG_INFO("Mount PEC Chip Needs Training");
+        }
+    }
+    return false;
 }
