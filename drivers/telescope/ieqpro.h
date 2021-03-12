@@ -93,6 +93,23 @@ class IEQPro : public INDI::Telescope, public INDI::GuiderInterface
             */
         void getStartupData();
 
+        /** Mod v3.0 PEC Data Status
+            * @brief get PEC data from the mount info.
+            * @param true  = Update log
+            * @param false = Don't update log
+            */
+        bool GetPECDataStatus(bool enabled);
+        
+        /* Mod v3.0 Adding PEC Recording Switches  */
+        ISwitch PECTrainingS[2]; 
+        ISwitchVectorProperty PECTrainingSP; 
+        ITextVectorProperty PECInfoTP;
+        IText PECInfoT[2] {};
+        char PECText[128];
+        int PECTime = 0;
+        bool isTraining;
+        // End Mod */
+
         /* Firmware */
         IText FirmwareT[5] {};
         ITextVectorProperty FirmwareTP;
