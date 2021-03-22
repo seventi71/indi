@@ -1,7 +1,5 @@
 /*
-    Copyright (C) 2017 by Jasem Mutlaq <mutlaqja@ikarustech.com>
-
-    Encoder Interface
+    Copyright (C) 2021 by Pawel Soja <kernel32.pl@gmail.com>
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -16,33 +14,36 @@
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, write to the Free Software
     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-
 */
 
 #pragma once
 
-#include "encoderinterface.h"
-#include <vector>
+#include <atomic>
+#include <functional>
+
 namespace INDI
 {
 
-/**
- * @brief The RawEncoder class sends the image as-is (lossless) to the client.
- *
- * It supports compression via zlib (.stream.z)
- */
-class RawEncoder : public EncoderInterface
+class Timer;
+class TimerPrivate
 {
 public:
-    RawEncoder();
-    ~RawEncoder();
+    TimerPrivate(Timer *p);
+    virtual ~TimerPrivate();
 
-    virtual bool upload(IBLOB *bp, const uint8_t *buffer, uint32_t nbytes, bool isCompressed=false) override;
+public:
+    void start();
+    void stop();
 
-private:
-    const char *getDeviceName();
-    std::vector<uint8_t> compressedFrame;
+public:
+    Timer *p;
+    int interval {1000};
 
+    std::atomic<int> timerId {-1};
+    bool singleShot {false};
+    bool active {false};
+
+    std::function<void()> callback;
 };
 
 }
