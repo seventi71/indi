@@ -5,6 +5,9 @@ PROJECT(libindi C CXX)
 # to always look for includes there:
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
+# Build Position Independent Code
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules/")
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake_modules/")
 include(GNUInstallDirs)
@@ -43,7 +46,7 @@ ENDIF ()
 set(INDI_SOVERSION "1")
 set(CMAKE_INDI_VERSION_MAJOR 1)
 set(CMAKE_INDI_VERSION_MINOR 9)
-set(CMAKE_INDI_VERSION_RELEASE 0)
+set(CMAKE_INDI_VERSION_RELEASE 1)
 set(CMAKE_INDI_VERSION_STRING "${CMAKE_INDI_VERSION_MAJOR}.${CMAKE_INDI_VERSION_MINOR}.${CMAKE_INDI_VERSION_RELEASE}")
 set(INDI_VERSION ${CMAKE_INDI_VERSION_MAJOR}.${CMAKE_INDI_VERSION_MINOR}.${CMAKE_INDI_VERSION_RELEASE})
 
@@ -172,6 +175,8 @@ include_directories( ${CFITSIO_INCLUDE_DIR})
 
 SET(indiclient_C_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/lilxml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/userio.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/indiuserio.c
     ${CMAKE_CURRENT_SOURCE_DIR}/base64.c)
 
 SET(indiclient_CXX_SRC
@@ -243,6 +248,8 @@ include_directories( ${CFITSIO_INCLUDE_DIR})
 message(STATUS "Building INDI Client with Qt5 support")
 SET(indiclientqt_C_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/lilxml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/userio.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/indiuserio.c
     ${CMAKE_CURRENT_SOURCE_DIR}/base64.c)
 SET(indiclientqt_CXX_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/basedevice.cpp
@@ -412,6 +419,8 @@ SET(indidriver_C_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/indidrivermain.c
     ${CMAKE_CURRENT_SOURCE_DIR}/eventloop.c
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/lilxml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/userio.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/indiuserio.c
     ${CMAKE_CURRENT_SOURCE_DIR}/base64.c
     )
 
@@ -1069,6 +1078,20 @@ SET(pegasus_SRC
 add_executable(indi_dmfc_focus ${pegasus_SRC})
 target_link_libraries(indi_dmfc_focus indidriver)
 install(TARGETS indi_dmfc_focus RUNTIME DESTINATION bin)
+################ Pegasus FocusCube Focuser ################
+SET(pegasusfocuscube_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/focuser/pegasus_focuscube.cpp)
+
+add_executable(indi_pegasus_focuscube ${pegasusfocuscube_SRC})
+target_link_libraries(indi_pegasus_focuscube indidriver)
+install(TARGETS indi_pegasus_focuscube RUNTIME DESTINATION bin)
+################ Pegasus ScopsOAG Focuser ################
+SET(pegasusScopsoag_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/focuser/pegasus_scopsoag.cpp)
+
+add_executable(indi_pegasus_scopsoag ${pegasusScopsoag_SRC})
+target_link_libraries(indi_pegasus_scopsoag indidriver)
+install(TARGETS indi_pegasus_scopsoag RUNTIME DESTINATION bin)
 ################## USB Focus V3 ##################
 
 SET(usbfocusv3_SRC
@@ -1757,6 +1780,15 @@ add_executable(indi_openweathermap_weather ${OpenWeatherMap_SRC})
 target_link_libraries(indi_openweathermap_weather indidriver ${CURL_LIBRARIES})
 install(TARGETS indi_openweathermap_weather RUNTIME DESTINATION bin)
 
+########### Deep Sky Dad FP1 ###############
+
+SET(snapcap_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/auxiliary/deepskydad_fp1.cpp)
+
+add_executable(indi_deepskydad_fp1 ${snapcap_SRC})
+target_link_libraries(indi_deepskydad_fp1 indidriver)
+install(TARGETS indi_deepskydad_fp1 RUNTIME DESTINATION bin)
+
 #####################################
 ############ INDI TOOLS #############
 #####################################
@@ -1766,7 +1798,9 @@ SET(indi_get_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/eventloop.c
     ${CMAKE_CURRENT_SOURCE_DIR}/base64.c
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/getINDIproperty.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/lilxml.c)
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/lilxml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/userio.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/indiuserio.c)
 
 IF (UNITY_BUILD)
     ENABLE_UNITY_BUILD(indi_get indi_get_SRC 10 c)
@@ -1789,7 +1823,9 @@ SET(indi_set_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/eventloop.c
     ${CMAKE_CURRENT_SOURCE_DIR}/base64.c
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/setINDIproperty.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/lilxml.c)
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/lilxml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/userio.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/indiuserio.c)
 
 IF (UNITY_BUILD)
     ENABLE_UNITY_BUILD(indi_set indi_set_SRC 10 c)
@@ -1813,7 +1849,9 @@ SET(indi_eval_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/base64.c
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/compiler.c
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/evalINDI.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/lilxml.c)
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/lilxml.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/userio.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/indiuserio.c)
 
 IF (UNITY_BUILD)
     ENABLE_UNITY_BUILD(indi_eval indi_eval_SRC 10 c)
